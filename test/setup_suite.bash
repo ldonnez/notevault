@@ -3,6 +3,34 @@ setup_suite() {
   TEST_HOME="$(readlink -f "$(mktemp -d)")"
   export TEST_HOME
   export HOME="$TEST_HOME"
+  export NOTES_DIR="$TEST_HOME/notes"
+  export GPG_RECIPIENTS="mock@example.com"
+  export PLAINDIR="notes"
+  export ENCRYPTEDDIR="encrypted"
+
+  mkdir -p "$NOTES_DIR"
+  mkdir -p "$NOTES_DIR/$PLAINDIR"
+  mkdir -p "$NOTES_DIR/$ENCRYPTEDDIR"
+
+  gpg --batch --gen-key <<EOF
+%no-protection
+Key-Type: RSA
+Key-Length: 1024
+Name-Real: mock user
+Name-Email: $GPG_RECIPIENTS
+Expire-Date: 0
+%commit
+EOF
+
+  git init "$NOTES_DIR"
+
+  cat >"$NOTES_DIR/.note-vault-config" <<EOF
+GPG_RECIPIENTS="$GPG_RECIPIENTS"
+EOF
+
+  export ARCHIVE="encrypted/notes.tar.gz.gpg"
+
+  cd "$NOTES_DIR" || exit
 
   # Source your script with mocked env
   # get the containing directory of this file

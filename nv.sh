@@ -3,7 +3,32 @@ set -euo pipefail
 
 VERSION=0.0.1 # x-release-please-version
 
-# Prints current version of memo
+# Set default global variables
+# Variables prefixed with _ should not be overriden.
+_set_default_values() {
+  : "${REPO_ROOT:=$(git rev-parse --show-toplevel)}"
+  : "${GPG_RECIPIENTS:=}"
+  : "${_CONFIG_FILE:=$REPO_ROOT/.note-vault-config}"
+  : "${PLAINDIR:=plaintext}"
+  : "${ARCHIVE:=$PLAINDIR.tar.gz.gpg}"
+}
+
+_load_config() {
+  # Ensure we're inside a git repo
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    printf "Not inside a Git repository.\n"
+    exit 1
+  fi
+
+  _set_default_values
+
+  # Load repo-specific config
+  if [ -f "$_CONFIG_FILE" ]; then
+    # shellcheck source=/dev/null
+    source "$_CONFIG_FILE"
+  fi
+}
+
 # Prints current version of nv
 #
 # Usage:
@@ -20,6 +45,47 @@ Commands:
   --version                           Print current version
   --help                              Show this help message
 EOF
+}
+
+###############################################################################
+# Setup
+###############################################################################
+
+# Set default global variables
+# Variables prefixed with _ should not be overriden.
+_set_default_values() {
+  : "${REPO_ROOT:=$(git rev-parse --show-toplevel)}"
+  : "${GPG_RECIPIENTS:=}"
+  : "${_CONFIG_FILE:=$REPO_ROOT/.note-vault-config}"
+  : "${PLAINDIR:=notes}"
+  : "${ENCRYPTEDDIR:=encrypted}"
+}
+
+# Initializes $PLAINDIR, $ENCRYPTEDDIR
+_setup_directories() {
+  # Create directories if not exist
+  mkdir -p "$PLAINDIR"
+  mkdir -p "$ENCRYPTEDDIR"
+}
+
+_load_config() {
+  # Ensure we're inside a git repo
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    printf "not inside a git repository.\n"
+    exit 1
+  fi
+
+  _set_default_values
+
+  # Load repo-specific config
+  if [ -f "$_CONFIG_FILE" ]; then
+    # shellcheck source=/dev/null
+    source "$_CONFIG_FILE"
+  fi
+
+  _setup_directories
+
+  : "${ARCHIVE:=$ENCRYPTEDDIR/$PLAINDIR.tar.gz.gpg}"
 }
 
 _parse_args() {
@@ -50,6 +116,7 @@ _parse_args() {
 
 # Entrypoint
 main() {
+  _load_config
   _parse_args "$@"
 }
 
