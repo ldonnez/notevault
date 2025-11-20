@@ -4,6 +4,7 @@ set -euo pipefail
 VERSION=0.0.1 # x-release-please-version
 
 # Prints current version of memo
+# Prints current version of nv
 #
 # Usage:
 #   nv --version
