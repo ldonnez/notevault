@@ -121,11 +121,47 @@ _gpg_encrypt() {
   gpg --quiet --yes --encrypt "${recipients[@]}" -o "$output_path" "$input_path"
 }
 
+# Decrypts given input file (path) to given output file (path)
+_gpg_decrypt() {
+  local input_path="$1" output_path="${2-""}"
+
+  if ! _file_exists "$input_path"; then
+    printf "File not found: %s" "$input_path"
+    exit 1
+  fi
+
+  gpg --quiet --yes --decrypt "$input_path" >"$output_path" || {
+    printf "Failed to decrypt %s\n" "$input_path" >&2
+    return 1
+  }
+}
+
 ###############################################################################
 # Core API
 ###############################################################################
 
-# Arhcives (with tar) and encrypts te archived file to $ARCHIVE
+# Decrypts encrypted archive to $PLAINDIR with gpg
+#
+# It will exit if $ARCHIVE does not exist
+#
+# Usage:
+#   nv_decrypt
+nv_decrypt() {
+  if ! _file_exists "$ARCHIVE"; then
+    printf "encrypted archive not found: %s\n" "$ARCHIVE"
+    exit 1
+  fi
+
+  local tmp_archive="$PLAINDIR.tar.gz"
+
+  gpg -o "$tmp_archive" --decrypt "$ARCHIVE"
+
+  tar -xzf "$tmp_archive"
+  rm -f "$tmp_archive"
+
+  printf "decrypted into %s\n" "$PLAINDIR"
+}
+
 # Archives (with tar) and encrypts te archived file to $ARCHIVE
 #
 # It will exit if $PLAINDIR does not exist
@@ -166,6 +202,7 @@ Commands:
   --version                           Print current version
   --help                              Show this help message
   --encrypt                           Encrypts $PLAINDIR -> $ARCHIVE
+  --decrypt                           Decrypt $ARCHIVE -> $PLAINDIR
 EOF
 }
 
@@ -223,6 +260,10 @@ _parse_args() {
       ;;
     --encrypt)
       nv_encrypt
+      return
+      ;;
+    --decrypt)
+      nv_decrypt
       return
       ;;
     --)
