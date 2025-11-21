@@ -74,6 +74,28 @@ _get_archive_filename() {
   printf "%s" "$(_get_unix_timestamp)-$hostname-$dir_signature"
 }
 
+# Extracts sha256 from given archive filename.
+# Format of filename should be <timestamp>-<hostname>-<sha256>.tar.gz.gpg
+_extract_sha256_from_archive() {
+  local file="$1"
+  local base
+  base=$(basename "$file")
+
+  # remove .tar.gz.gpg suffix
+  base="${base%.tar.gz.gpg}"
+
+  # drop timestamp + hostname (everything up to last '-')
+  sha="${base##*-}"
+
+  # Validate that it's exactly 64 hex characters
+  if printf "%s" "$sha" | grep -Eq '^[0-9a-fA-F]{64}$'; then
+    printf "%s\n" "$sha"
+    return 0
+  fi
+
+  printf "error: archive filename does not contain a valid SHA256: %s\n" "$file" >&2
+  return 1
+}
 
 # Rotates archives in a directory for a specific host by removing the oldest archives.
 # It will keep the total number of archives below given ($keep) limit.
@@ -195,6 +217,21 @@ _gpg_encrypt() {
   gpg --quiet --yes --encrypt "${recipients[@]}" -o "$output_path" "$input_path"
 }
 
+# Decrypts given input file (path) to given output file (path)
+_gpg_decrypt() {
+  local input_path="$1" output_path="${2-""}"
+
+  if ! _file_exists "$input_path"; then
+    printf "File not found: %s" "$input_path"
+    exit 1
+  fi
+
+  gpg --quiet --yes --decrypt "$input_path" >"$output_path" || {
+    printf "Failed to decrypt %s\n" "$input_path" >&2
+    exit 1
+  }
+}
+
 # Returns all archives in given $archivedir sorted oldest first.
 _get_archives_sorted() {
   local archivedir="$1"
@@ -205,6 +242,21 @@ _get_archives_sorted() {
     sort
 }
 
+# Returns all archives in given $archivedir sorted latest first.
+_check_local_changes() {
+  local latest_sig="$1"
+
+  if _dir_exists "$PLAINDIR"; then
+    local current_sig
+    current_sig=$(_dir_signature "$PLAINDIR")
+
+    if [ "$current_sig" != "$latest_sig" ]; then
+      printf "Local changes detected in %s — decrypt aborted.\n" "$PLAINDIR"
+      exit 1
+    fi
+  fi
+}
+
 ###############################################################################
 # Core API
 ###############################################################################
@@ -212,25 +264,26 @@ _get_archives_sorted() {
 # Decrypts all and unarchives all tar.gz.gpg files to $PLAINDIR
 # Starts with oldest archive first.
 #
-# It will exit if $PLAINDIR does exists.
+# It will exit when local changes are found to ensure not overwriting work.
 #
 # Usage:
 #   nv_decrypt
 nv_decrypt() {
-  if _dir_exists "$PLAINDIR"; then
-    printf "%s exists, remove or run clean first.\n" "$PLAINDIR"
-    exit 1
-  fi
-
-  mkdir -p "$PLAINDIR"
-
   local archives
-  archives="$(_get_archives_sorted)"
+  archives="$(_get_archives_sorted "$ARCHIVEDIR")"
 
   if [ -z "$archives" ]; then
     printf "no archives found.\n"
     return 0
   fi
+
+  local latest_archive
+  latest_archive="$(tail -n 1 <<<"$archives")"
+
+  local latest_sha
+  latest_sha=$(_extract_sha256_from_archive "$latest_archive")
+
+  _check_local_changes "$latest_sha"
 
   # iterate and apply
   while IFS= read -r archive; do
@@ -255,7 +308,6 @@ nv_decrypt() {
 # Archives, encrypts and signs the $PLAINDIR to $ARCHIVEDIR
 #
 # It will exit if $PLAINDIR does not exist
-#
 #
 # Usage:
 #   nv_encrypt
@@ -361,6 +413,10 @@ _parse_args() {
       nv_encrypt
       return
       ;;
+    decrypt)
+      nv_decrypt
+      return
+      ;;
     *)
       nv_help
       exit 1
@@ -368,7 +424,7 @@ _parse_args() {
     esac
   done
 
-  printf "Usage: nv [version | help | encrypt]\n"
+  printf "Usage: nv [version | help | encrypt | decrypt]\n"
   exit 1
 }
 
