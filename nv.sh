@@ -3,6 +3,290 @@ set -euo pipefail
 
 VERSION=0.0.1 # x-release-please-version
 
+###############################################################################
+# Helpers (private)
+###############################################################################
+
+_dir_exists() {
+  [[ -d "$1" ]]
+}
+
+_file_exists() {
+  local filepath="$1"
+  [[ -f "$filepath" ]]
+}
+
+# Trim leading or trailing spaces of a string
+_trim() {
+  local string="$1"
+
+  # trim leading spaces
+  string="${string#"${string%%[! ]*}"}"
+
+  # trim trailing spaces
+  string="${string%"${string##*[! ]}"}"
+  printf "%s" "$string"
+}
+
+_get_unix_timestamp() {
+  date +%s
+}
+
+# Generate sha256 from given file
+_sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    # GNU coreutils
+    if [ "$1" = "-" ]; then
+      sha256sum | awk '{print $1}'
+    else
+      sha256sum "$1" | awk '{print $1}'
+    fi
+  else
+    # macOS/BSD shasum
+    if [ "$1" = "-" ]; then
+      shasum -a 256 | awk '{print $1}'
+    else
+      shasum -a 256 "$1" | awk '{print $1}'
+    fi
+  fi
+}
+
+# Generate sha256 signature from given directory
+_dir_signature() {
+  find "$1" -type f -print0 |
+    sort -z |
+    while IFS= read -r -d '' f; do
+      printf "%s:%s\n" "$f" "$(_sha256 "$f")"
+    done |
+    _sha256 -
+}
+
+###############################################################################
+# Common (private)
+###############################################################################
+
+# Returns filename to be used as archive filename
+# Format of: <timestamp>-<hostname>-<signature>
+_get_archive_filename() {
+  local hostname="$1"
+  local dir_signature="$2"
+
+  printf "%s" "$(_get_unix_timestamp)-$hostname-$dir_signature"
+}
+
+
+# Rotates archives in a directory for a specific host by removing the oldest archives.
+# It will keep the total number of archives below given ($keep) limit.
+_rotate_archives_by_host() {
+  local archivedir="$1"
+  local hostname="$2"
+  local keep="$3"
+
+  local archives
+  archives=$(_get_archives_sorted "$ARCHIVEDIR")
+
+  local count
+  count=$(printf "%s\n" "$archives" | grep -c .)
+
+  if ((count <= keep)); then
+    return 0
+  fi
+
+  local remove_count=$((count - keep))
+
+  printf "rotating archives for host %s (removing %d old archives)...\n" \
+    "$hostname" "$remove_count"
+
+  # Remove the oldest archives
+  printf "%s\n" "$archives" |
+    head -n "$remove_count" |
+    while IFS= read -r old; do
+      printf "removing %s\n" "$archivedir/$old"
+      rm -f "$archivedir/$old"
+    done
+}
+
+# Validates if all the given recipients exist in GPG keyring.
+_gpg_recipients_exists() {
+  local recipients="$1"
+  local missing_keys=()
+
+  IFS=',' read -ra keys <<<"$recipients"
+
+  if ((${#keys[@]} > 0)); then
+    for key in "${keys[@]}"; do
+      key="$(_trim "$key")"
+
+      if ! gpg --list-keys "$key" &>/dev/null; then
+        missing_keys+=("$key")
+      fi
+    done
+  fi
+
+  if ((${#missing_keys[@]} > 0)); then
+    printf "GPG recipient(s) not found: %s\n" "${missing_keys[*]}" >&2
+    exit 1
+  fi
+}
+
+# Builds the gpg recipients (-r param in gpg) based on given key_ids
+# When given key_ids is empty, --default-recipient-self is given, which means the first key found in the keyring is used as a recipient.
+# returns array of "-r <key_id> -r <key_id2>"
+#
+# Usage:
+#
+# ```
+# local -a recipients=()
+#
+# if ! _build_gpg_recipients "$GPG_RECIPIENTS" recipients; then
+#   return 1
+# fi
+#
+# gpg --quiet --yes --armor --encrypt "${recipients[@]}"...
+# ```
+_build_gpg_recipients() {
+  local gpg_recipients="$1"
+  local output_array="$2"
+
+  if [[ -z "$gpg_recipients" ]]; then
+    eval "$output_array+=(\"--default-recipient-self\")"
+    return 0
+  fi
+
+  local IFS=',' items
+  read -r -a items <<<"$gpg_recipients"
+
+  if [[ ${#items[@]} -eq 0 ]]; then
+    eval "$output_array+=(\"--default-recipient-self\")"
+    return 0
+  fi
+
+  local id
+  for id in "${items[@]}"; do
+    id=$(_trim "$id")
+    [[ -z "$id" ]] && continue
+
+    if ! _gpg_recipients_exists "$id"; then
+      printf "GPG recipient(s) not found: %s\n" "$id" >&2
+      return 1
+    fi
+
+    eval "$output_array+=(\"-r\" \"$id\")"
+  done
+}
+
+# Encrypts the content of given input file (path) to given output file (path)
+# This will encrypt the file itself.
+_gpg_encrypt() {
+  # Sets output_path to input_path when output_path is not given
+  local input_path="$1" output_path="${2-$1}"
+
+  if ! _file_exists "$input_path"; then
+    printf "file not found: %s" "$input_path"
+    exit 1
+  fi
+
+  local -a recipients=()
+
+  if ! _build_gpg_recipients "$GPG_RECIPIENTS" recipients; then
+    return 1
+  fi
+
+  gpg --quiet --yes --encrypt "${recipients[@]}" -o "$output_path" "$input_path"
+}
+
+# Returns all archives in given $archivedir sorted oldest first.
+_get_archives_sorted() {
+  local archivedir="$1"
+
+  # sort lexicographically (timestamp prefix ensures chronological order)
+  find "$archivedir" -type f -name '*.tar.gz.gpg' -print0 2>/dev/null |
+    while IFS= read -r -d '' f; do basename "$f"; done |
+    sort
+}
+
+###############################################################################
+# Core API
+###############################################################################
+
+# Decrypts all and unarchives all tar.gz.gpg files to $PLAINDIR
+# Starts with oldest archive first.
+#
+# It will exit if $PLAINDIR does exists.
+#
+# Usage:
+#   nv_decrypt
+nv_decrypt() {
+  if _dir_exists "$PLAINDIR"; then
+    printf "%s exists, remove or run clean first.\n" "$PLAINDIR"
+    exit 1
+  fi
+
+  mkdir -p "$PLAINDIR"
+
+  local archives
+  archives="$(_get_archives_sorted)"
+
+  if [ -z "$archives" ]; then
+    printf "no archives found.\n"
+    return 0
+  fi
+
+  # iterate and apply
+  while IFS= read -r archive; do
+    local archive_path="$ARCHIVEDIR/$archive"
+
+    if ! _file_exists "$archive_path"; then
+      printf "skipping missing archive %s\n" "$archive"
+      continue
+    fi
+
+    local tmp="tmp-file"
+
+    _gpg_decrypt "$archive_path" "$tmp"
+    tar -xvf "$tmp" -C "$PLAINDIR"
+    rm -f "$tmp"
+
+  done < <(printf "%s\n" "$archives")
+
+  printf "decrypted into %s\n" "$PLAINDIR"
+}
+
+# Archives, encrypts and signs the $PLAINDIR to $ARCHIVEDIR
+#
+# It will exit if $PLAINDIR does not exist
+#
+#
+# Usage:
+#   nv_encrypt
+nv_encrypt() {
+  if ! _dir_exists "$PLAINDIR"; then
+    printf "%s does not exist." "$PLAINDIR"
+    exit 1
+  fi
+
+  local tmp_archive="$PLAINDIR.tar.gz"
+
+  printf "creating tarball...\n"
+  tar -C "$PLAINDIR" -czf "$tmp_archive" .
+
+  local hostname
+  hostname="$(hostname)"
+
+  local dir_signature
+  dir_signature=$(_dir_signature "$PLAINDIR")
+
+  local archive
+  archive="$ARCHIVEDIR/$(_get_archive_filename "$hostname" "$dir_signature").tar.gz.gpg"
+
+  _gpg_encrypt "$tmp_archive" "$archive"
+
+  rm -f "$tmp_archive"
+  _rotate_archives_by_host "$ARCHIVEDIR" "$hostname" "$ARCHIVES_TO_KEEP"
+
+  printf "encrypted -> %s\n" "$archive"
+}
+
 # Prints current version of nv
 #
 # Usage:
@@ -73,12 +357,8 @@ _parse_args() {
       nv_version
       return
       ;;
-    --encrypt)
+    encrypt)
       nv_encrypt
-      return
-      ;;
-    --decrypt)
-      nv_decrypt
       return
       ;;
     *)
@@ -88,7 +368,7 @@ _parse_args() {
     esac
   done
 
-  printf "Usage: nv [version | help]\n"
+  printf "Usage: nv [version | help | encrypt]\n"
   exit 1
 }
 
