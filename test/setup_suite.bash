@@ -33,8 +33,6 @@ EOF
 GPG_RECIPIENTS="$GPG_RECIPIENTS"
 EOF
 
-  cd "$REPO_ROOT" || exit
-
   # Source your script with mocked env
   # get the containing directory of this file
   # use $BATS_TEST_FILENAME instead of ${BASH_SOURCE[0]} or $0,
