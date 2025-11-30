@@ -8,6 +8,8 @@ setup_suite() {
   export PLAINDIR="$REPO_ROOT/notes"
   export ARCHIVEDIR="$REPO_ROOT/archives"
   export ARCHIVES_TO_KEEP=10
+  export DEFAULT_GIT_COMMIT
+  DEFAULT_GIT_COMMIT="$(hostname): add archive"
 
   mkdir -p "$REPO_ROOT"
   mkdir -p "$PLAINDIR"

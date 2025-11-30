@@ -11,5 +11,5 @@ setup() {
 @test "prints Usage pattern" {
 
   run main
-  assert_output "Usage: nv [version | help | encrypt | decrypt]"
+  assert_output "Usage: nv [version | help | encrypt | decrypt | commit]"
 }

@@ -261,6 +261,21 @@ _check_local_changes() {
 # Core API
 ###############################################################################
 
+# Pulls latest changes of HEAD from origin.
+# Stages latest changes in $ARCHIVEDIR and commits them when changes found.
+#
+# Usage:
+#   nv_commit
+nv_commit() {
+  git pull origin HEAD --rebase
+
+  git add "$ARCHIVEDIR"
+
+  if ! git diff --cached --quiet; then
+    git commit -m "$DEFAULT_GIT_COMMIT"
+  fi
+}
+
 # Decrypts all and unarchives all tar.gz.gpg files to $PLAINDIR
 # Starts with oldest archive first.
 #
@@ -356,6 +371,7 @@ Commands:
   help                              Show this help message
   encrypt                           Encrypts $PLAINDIR -> $ARCHIVEDIR
   decrypt                           Decrypt $ARCHIVEDIR -> $PLAINDIR
+  commit                            Creates local git commit: $DEFAULT_GIT_COMMIT with latest archive changes
 EOF
 }
 
@@ -372,6 +388,7 @@ _set_default_values() {
   : "${PLAINDIR:=$REPO_ROOT/notes}"
   : "${ARCHIVEDIR:=$REPO_ROOT/archives}"
   : "${ARCHIVES_TO_KEEP:=10}"
+  : "${DEFAULT_GIT_COMMIT:=$(hostname): add archive}"
 }
 
 # Initializes $ARCHIVEDIR
@@ -417,6 +434,10 @@ _parse_args() {
       nv_decrypt
       return
       ;;
+    commit)
+      nv_commit
+      return
+      ;;
     *)
       nv_help
       exit 1
@@ -424,7 +445,7 @@ _parse_args() {
     esac
   done
 
-  printf "Usage: nv [version | help | encrypt | decrypt]\n"
+  printf "Usage: nv [version | help | encrypt | decrypt | commit]\n"
   exit 1
 }
 
