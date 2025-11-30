@@ -8,8 +8,8 @@ setup() {
   source "nv.sh"
 }
 
-@test "prints Usage pattern" {
-
-  run main
-  assert_output "Usage: nv [version | help | encrypt | decrypt | commit | sync | upgrade]"
+@test "returns the absolute path the script is run" {
+  run _resolve_script_path
+  assert_success
+  assert_output "$(pwd)"
 }

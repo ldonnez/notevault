@@ -2,6 +2,7 @@
 set -euo pipefail
 
 VERSION=0.1.2 # x-release-please-version
+REPO="ldonnez/notevault"
 
 ###############################################################################
 # Helpers (private)
@@ -61,9 +62,49 @@ _dir_signature() {
     _sha256 -
 }
 
+# Resolves the absolute path of where this script is run (it will follow symlinks)
+_resolve_script_path() {
+  local source="${BASH_SOURCE[0]}"
+  while [ -h "$source" ]; do
+    local dir
+    dir="$(cd -P "$(dirname "$source")" && pwd)"
+
+    source="$(readlink "$source")"
+    [[ $source != /* ]] && source="$dir/$source"
+  done
+  cd -P "$(dirname "$source")" && pwd
+}
+
 ###############################################################################
 # Common (private)
 ###############################################################################
+
+# Returns latest release version of notevault by using the Github API.
+_get_latest_version() {
+  curl -s https://api.github.com/repos/$REPO/releases/latest | grep tag_name | cut -d '"' -f4
+}
+
+# Determines if current installed version is older then given version. Returns exit code 1 when no upgrade is necessary, otherwise will return 0.
+# Caution! Does not work with version strings like v0.1.0-alpha. Wil only work with strings like v0.1.0, v0.1.2 etc.
+# See test/check_upgrade_test.bats
+_check_upgrade() {
+  local version="$1"
+  local current_version="v$VERSION"
+
+  local newer
+  newer=$(printf '%s\n' "$version" "$current_version" | sort -V | tail -n1)
+
+  if [ "$version" = "$current_version" ]; then
+    printf "Already up to date\n"
+    return 1
+  elif [ "$newer" = "$version" ]; then
+    printf "Upgrade available: %s -> %s\n" "$current_version" "$version"
+    return 0
+  else
+    printf "Current version (%s) is newer than latest %s?\n" "$current_version" "$version"
+    return 1
+  fi
+}
 
 # Returns filename to be used as archive filename
 # Format of: <timestamp>-<hostname>-<signature>
@@ -300,6 +341,51 @@ _check_local_changes() {
 # Core API
 ###############################################################################
 
+# Upgrades nv in-place when a new version is found.
+#
+# Will replace notevault by resolving the path where the script is located, even if it is a symlink.
+#
+# Usage:
+#   nv upgrade
+nv_upgrade() {
+  local latest_version
+
+  if ! latest_version=$(_get_latest_version); then
+    printf "Version not found."
+    return 1
+  fi
+
+  if _check_upgrade "$latest_version"; then
+    # Ask to confirm upgrade
+    read -r -p "Do you want to upgrade now? [Y/n] " reply
+    if [ -z "$reply" ] || [ "$reply" = "y" ] || [ "$reply" = "Y" ]; then
+      printf "Proceeding with upgrade...\n"
+    else
+      printf "Upgrade cancelled.\n"
+      return 0
+    fi
+
+    local url="https://github.com/$REPO/releases/download/$latest_version/nv.tar.gz"
+
+    local script_path
+    script_path=$(_resolve_script_path)
+
+    printf "Downloading %s\n" "$url"
+    curl -sSL "$url" -o /tmp/nv.tar.gz
+
+    mkdir -p /tmp/memo && tar -xzf /tmp/nv.tar.gz -C /tmp/nv
+
+    printf "Upgrade nv in %s...\n" "$script_path"
+    install -m 0700 /tmp/memo/nv.sh "$script_path"/nv
+
+    rm -rf /tmp/memo
+    rm -f /tmp/nv.tar.gz
+
+    printf "Upgrade success!"
+    return 0
+  fi
+}
+
 # Commits first then pushes to origin
 #
 # Usage:
@@ -423,6 +509,7 @@ Commands:
   decrypt                           Decrypt $ARCHIVEDIR -> $PLAINDIR
   commit                            Creates local git commit: $DEFAULT_GIT_COMMIT with latest archive changes
   sync                              Same as commit but includes pushing to origin
+  upgrade                           Upgrades nv in-place
 EOF
 }
 
@@ -493,6 +580,10 @@ _parse_args() {
       nv_sync
       return
       ;;
+    upgrade)
+      nv_upgrade
+      return
+      ;;
     *)
       nv_help
       exit 1
@@ -500,7 +591,7 @@ _parse_args() {
     esac
   done
 
-  printf "Usage: nv [version | help | encrypt | decrypt | commit | sync]\n"
+  printf "Usage: nv [version | help | encrypt | decrypt | commit | sync | upgrade]\n"
   exit 1
 }
 
