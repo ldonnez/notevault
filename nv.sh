@@ -451,7 +451,7 @@ nv_decrypt() {
     tar -xvf "$tmp" -C "$PLAINDIR"
     rm -f "$tmp"
 
-  done < <(printf "%s\n" "$archives")
+  done <<<"$archives"
 
   printf "decrypted into %s\n" "$PLAINDIR"
 }
