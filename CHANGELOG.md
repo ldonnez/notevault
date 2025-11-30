@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/ldonnez/notevault/compare/v0.1.1...v0.1.2) (2025-11-30)
+
+
+### Bug Fixes
+
+* **ci:** simplify tarball name to upload ([519531d](https://github.com/ldonnez/notevault/commit/519531d7aebc5f399ad562d86775af525b14bb2e))
+
 ## [0.1.1](https://github.com/ldonnez/notevault/compare/v0.1.0...v0.1.1) (2025-11-30)
 
 
