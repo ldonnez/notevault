@@ -37,7 +37,7 @@ jobs:
 
           tar -czf $TARBALL_NAME -C . nv.sh
 
-          gh release upload "v$VERSION" $TARBALL_NAME \
+          gh release upload "$VERSION" $TARBALL_NAME \
             --repo ${{ github.repository }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT_TOKEN }}
