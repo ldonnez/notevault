@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.0](https://github.com/ldonnez/notevault/compare/v0.1.2...v0.2.0) (2025-11-30)
+
+
+### Features
+
+* add install script ([198ec21](https://github.com/ldonnez/notevault/commit/198ec21bbe820c80d79c633071f57b3ca6dbad78))
+* ensure cached gpg password when decrypting ([5f76c9e](https://github.com/ldonnez/notevault/commit/5f76c9e5f148a8121491a8e6a84e608d4e0fc487))
+* upgrade command ([52c2909](https://github.com/ldonnez/notevault/commit/52c2909b062caa8e811e3c9fd46a45573cc05f32))
+
+
+### Bug Fixes
+
+* ensure $PLAINDIR exists when decrypting ([170d342](https://github.com/ldonnez/notevault/commit/170d3427a52cb02f8a0c4b70b6bb7d3ab339a61e))
+* use here-string instead of substitution ([6a39cd1](https://github.com/ldonnez/notevault/commit/6a39cd157e0d82533a7d7af8bc8cba8ecc23ca3c))
+
 ## [0.1.2](https://github.com/ldonnez/notevault/compare/v0.1.1...v0.1.2) (2025-11-30)
 
 
