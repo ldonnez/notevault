@@ -381,12 +381,12 @@ nv_upgrade() {
     printf "Downloading %s\n" "$url"
     curl -sSL "$url" -o /tmp/nv.tar.gz
 
-    mkdir -p /tmp/memo && tar -xzf /tmp/nv.tar.gz -C /tmp/nv
+    mkdir -p /tmp/nv && tar -xzf /tmp/nv.tar.gz -C /tmp/nv
 
     printf "Upgrade nv in %s...\n" "$script_path"
-    install -m 0700 /tmp/memo/nv.sh "$script_path"/nv
+    install -m 0700 /tmp/nv/nv.sh "$script_path"/nv
 
-    rm -rf /tmp/memo
+    rm -rf /tmp/nv
     rm -f /tmp/nv.tar.gz
 
     printf "Upgrade success!"
