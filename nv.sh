@@ -151,6 +151,45 @@ _gpg_recipients_exists() {
   fi
 }
 
+# _gpg_pinentry: Ensure GPG agent has the passphrase cached
+#
+# Behavior:
+#   - If passphrase is cached: does nothing.
+#   - If not cached and $GPG_PASSPHRASE is set: use loopback mode with that passphrase. (Used for environments without TTY like tests, CI, etc...)
+#   - If not cached and $GPG_PASSPHRASE is unset: pinentry will prompt.
+#
+# Usage:
+#   _gpg_pinentry <keyid>
+_gpg_pinentry() {
+  local keyid="${1:-}"
+
+  # Step 1: test if cached (no pinentry triggered)
+  if ! printf 'test' | gpg --sign \
+    --batch --no-tty --pinentry-mode=error \
+    ${keyid:+--local-user "$keyid"} \
+    -o /dev/null 2>/dev/null; then
+
+    printf 'Passphrase not cached — prompting...\n' >&2
+
+    # Step 2: cache passphrase either via loopback or pinentry
+    if [[ -n "${GPG_PASSPHRASE:-}" ]]; then
+      printf 'test' | gpg --sign \
+        --batch --yes --pinentry-mode=loopback \
+        --passphrase "$GPG_PASSPHRASE" \
+        ${keyid:+--local-user "$keyid"} \
+        -o /dev/null
+    else
+      export GPG_TTY
+      GPG_TTY=$(tty 2>/dev/null || true)
+
+      printf 'test' | gpg --sign \
+        --batch --no-tty \
+        ${keyid:+--local-user "$keyid"} \
+        -o /dev/null
+    fi
+  fi
+}
+
 # Builds the gpg recipients (-r param in gpg) based on given key_ids
 # When given key_ids is empty, --default-recipient-self is given, which means the first key found in the keyring is used as a recipient.
 # returns array of "-r <key_id> -r <key_id2>"
@@ -293,6 +332,8 @@ nv_commit() {
 # Usage:
 #   nv_decrypt
 nv_decrypt() {
+  _gpg_pinentry
+
   local archives
   archives="$(_get_archives_sorted "$ARCHIVEDIR")"
 
