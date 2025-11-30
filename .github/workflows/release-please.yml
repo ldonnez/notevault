@@ -33,7 +33,7 @@ jobs:
         if: ${{ steps.release.outputs.release_created == 'true' }}
         run: |
           VERSION=${{ steps.release.outputs.tag_name }}
-          TARBALL_NAME="nv-${VERSION}.tar.gz"
+          TARBALL_NAME="nv.tar.gz"
 
           tar -czf $TARBALL_NAME -C . nv.sh
 
