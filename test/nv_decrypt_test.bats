@@ -84,3 +84,30 @@ decrypted into $PLAINDIR"
   run _file_exists "$PLAINDIR/test2.txt"
   assert_success
 }
+
+@test "decrypts to $PLAINDIR when $PLAINDIR does not exist yet" {
+  local input_path="$PLAINDIR/test.txt"
+  touch "$input_path"
+
+  nv_encrypt
+
+  rm -rf "$PLAINDIR"
+
+  run nv_decrypt
+  assert_success
+
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    assert_output "x ./
+x ./test.txt
+decrypted into $PLAINDIR"
+  else
+    assert_output "./
+./test.txt
+decrypted into $PLAINDIR"
+  fi
+
+  run _file_exists "$PLAINDIR/test.txt"
+  assert_success
+
+  rm -rf "${ARCHIVEDIR:?}"/*
+}

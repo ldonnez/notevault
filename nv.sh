@@ -436,6 +436,8 @@ nv_decrypt() {
 
   _check_local_changes "$latest_sha"
 
+  mkdir -p "$PLAINDIR"
+
   # iterate and apply
   while IFS= read -r archive; do
     local archive_path="$ARCHIVEDIR/$archive"
