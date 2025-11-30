@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/ldonnez/notevault/compare/v0.3.0...v0.3.1) (2025-11-30)
+
+
+### Bug Fixes
+
+* extract to correct tmp dir ([0a3b1f0](https://github.com/ldonnez/notevault/commit/0a3b1f0c23f7384ce08eb9b9e6e538ba2e565d38))
+
 ## [0.3.0](https://github.com/ldonnez/notevault/compare/v0.2.0...v0.3.0) (2025-11-30)
 
 
