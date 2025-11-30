@@ -261,6 +261,15 @@ _check_local_changes() {
 # Core API
 ###############################################################################
 
+# Commits first then pushes to origin
+#
+# Usage:
+#   nv_sync
+nv_sync() {
+  nv_commit
+  git push origin HEAD
+}
+
 # Pulls latest changes of HEAD from origin.
 # Stages latest changes in $ARCHIVEDIR and commits them when changes found.
 #
@@ -372,6 +381,7 @@ Commands:
   encrypt                           Encrypts $PLAINDIR -> $ARCHIVEDIR
   decrypt                           Decrypt $ARCHIVEDIR -> $PLAINDIR
   commit                            Creates local git commit: $DEFAULT_GIT_COMMIT with latest archive changes
+  sync                              Same as commit but includes pushing to origin
 EOF
 }
 
@@ -438,6 +448,10 @@ _parse_args() {
       nv_commit
       return
       ;;
+    sync)
+      nv_sync
+      return
+      ;;
     *)
       nv_help
       exit 1
@@ -445,7 +459,7 @@ _parse_args() {
     esac
   done
 
-  printf "Usage: nv [version | help | encrypt | decrypt | commit]\n"
+  printf "Usage: nv [version | help | encrypt | decrypt | commit | sync]\n"
   exit 1
 }
 
