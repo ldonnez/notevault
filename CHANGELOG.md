@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/ldonnez/notevault/compare/v0.1.0...v0.1.1) (2025-11-30)
+
+
+### Bug Fixes
+
+* **ci:** upload to correct version ([8c48942](https://github.com/ldonnez/notevault/commit/8c48942843bb200dae418e5afdcc093bc0dc333a))
+
 ## [0.1.0](https://github.com/ldonnez/notevault/compare/v0.0.1...v0.1.0) (2025-11-30)
 
 
