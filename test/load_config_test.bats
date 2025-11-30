@@ -33,6 +33,8 @@ EOF
     assert_equal "$PLAINDIR" "test"
     assert_equal "$ARCHIVEDIR" "encrypted_archives"
     assert_equal "$ARCHIVES_TO_KEEP" 5
+
+    rm -rf "$ARCHIVEDIR"
   )
 }
 

@@ -14,6 +14,8 @@ setup() {
 
   run _sha256 "$file"
   assert_success
+
+  rm -f "$file"
 }
 
 @test "returns failure when file does not exist" {

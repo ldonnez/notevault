@@ -14,7 +14,7 @@ setup() {
 
   _gpg_encrypt "$input_path" "$input_path.gpg"
 
-  run _gpg_decrypt "$input_path.gpg" "$input_path.txt"
+  run _gpg_decrypt "$input_path.gpg" "$input_path"
   assert_success
 
   rm -f "$input_path"
