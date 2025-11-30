@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/ldonnez/notevault/compare/v0.2.0...v0.3.0) (2025-11-30)
+
+
+### Features
+
+* make generating signature deterministic ([99d5e63](https://github.com/ldonnez/notevault/commit/99d5e63eccec253b735362f27be2621d417c1225))
+
 ## [0.2.0](https://github.com/ldonnez/notevault/compare/v0.1.2...v0.2.0) (2025-11-30)
 
 
