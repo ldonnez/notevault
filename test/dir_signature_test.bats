@@ -9,7 +9,7 @@ setup() {
 }
 
 @test "returns success when directory exists" {
-  local file="$PLAINDIR/test.txt"
+  local file="$PLAINDIR"
   touch "$file"
 
   run _dir_signature "$file"

@@ -54,12 +54,20 @@ _sha256() {
 
 # Generate sha256 signature from given directory
 _dir_signature() {
-  find "$1" -type f -print0 |
-    sort -z |
-    while IFS= read -r -d '' f; do
-      printf "%s:%s\n" "$f" "$(_sha256 "$f")"
-    done |
-    _sha256 -
+  local root="$1"
+
+  (
+    cd "$root" || exit 1
+
+    find . -type f \
+      ! -name '.DS_Store' \
+      ! -name '._*' \
+      -print0 |
+      sort -z |
+      while IFS= read -r -d '' f; do
+        printf "%s:%s\n" "$f" "$(_sha256 "$f")"
+      done
+  ) | _sha256 -
 }
 
 # Resolves the absolute path of where this script is run (it will follow symlinks)
